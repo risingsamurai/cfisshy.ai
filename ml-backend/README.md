@@ -35,7 +35,30 @@ python -m pip install -r requirements.txt
 python -m uvicorn main:app --host 127.0.0.1 --port 8081
 ```
 
-Point the frontend at this base URL (no path suffix): `VITE_ANALYZER_BASE_URL=http://127.0.0.1:8081`.
+### Windows (when `pip` / `uvicorn` are “not recognized”)
+
+Python’s **Scripts** folder is often missing from `PATH`. Use the **`py`** launcher instead of bare `pip` / `uvicorn`:
+
+```powershell
+cd ml-backend
+py -m pip install -r requirements.txt
+py -m uvicorn main:app --host 127.0.0.1 --port 8081
+```
+
+Or run the helper script (same as above, default port **8081**):
+
+```powershell
+cd ml-backend
+powershell -ExecutionPolicy Bypass -File .\run.ps1
+```
+
+If you see **“address already in use”** (WinError 10048), something else is using that port—stop that process or use another port:
+
+```powershell
+py -m uvicorn main:app --host 127.0.0.1 --port 8082
+```
+
+Point the frontend at this base URL (no path suffix), e.g. `VITE_ANALYZER_BASE_URL=http://127.0.0.1:8081` (or **8082** if you switched ports).
 
 ## Quick validation
 
