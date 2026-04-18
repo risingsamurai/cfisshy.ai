@@ -1,8 +1,23 @@
+# Dependencies
 node_modules/
+frontend/node_modules/
+
+# Build output
 dist/
+frontend/dist/
+
+# Environment
 .env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+
+# Tooling
 pnpm.exe
+pnpm-install.exe
 *.tsbuildinfo
+frontend/*.tsbuildinfo
 
 # Python
 __pycache__/
@@ -11,3 +26,10 @@ __pycache__/
 .Python
 venv/
 .venv/
+ml-backend/.venv/
+ml-backend/__pycache__/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.log

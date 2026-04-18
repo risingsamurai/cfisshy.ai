@@ -1,17 +1,21 @@
 # LUMIS.AI ML Backend
 
+FastAPI service for fairness auditing: **AIF360** metrics, **SHAP** feature impacts, **reweighing** mitigation.
+
 ## Endpoints
 
-- `GET /health` - service health check
-- `POST /analyze` - run full fairness + explainability pipeline
-- `POST /mitigate` - apply reweighing mitigation and compare before/after metrics
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/analyze` | Full pipeline: train baseline (or use uploaded model), metrics, top features, recommendations |
+| POST | `/mitigate` | Reweighing + retrain; returns before vs after |
 
-## Request schema (`/analyze`, `/mitigate`)
+## Request body (`/analyze`, `/mitigate`)
 
 ```json
 {
-  "dataset_base64": "<base64 csv string>",
-  "target_column": "hired",
+  "dataset_base64": "<base64-encoded CSV>",
+  "target_column": "selected",
   "sensitive_attributes": ["gender"],
   "favorable_outcome": 1,
   "model_base64": null,
@@ -21,15 +25,31 @@
 }
 ```
 
+For `/mitigate`, add `"method": "reweighing"`.
+
 ## Run locally
 
 ```bash
-py -m pip install -r requirements.txt
-py -m uvicorn main:app --host 127.0.0.1 --port 8081
+cd ml-backend
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --host 127.0.0.1 --port 8081
 ```
+
+Point the frontend at this base URL (no path suffix): `VITE_ANALYZER_BASE_URL=http://127.0.0.1:8081`.
 
 ## Quick validation
 
 ```bash
-py sample_test.py
+cd ml-backend
+python sample_test.py
 ```
+
+## Docker (Cloud Run)
+
+```bash
+cd ml-backend
+docker build -t lumis-ml-backend .
+docker run -p 8081:8080 lumis-ml-backend
+```
+
+(Uvicorn in Dockerfile listens on `8080` inside the container; map host `8081` as needed.)

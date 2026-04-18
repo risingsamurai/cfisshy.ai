@@ -47,10 +47,10 @@ def run_sample() -> None:
     mitigate_res = client.post("/mitigate", json=payload)
 
     print("Analyze status:", analyze_res.status_code)
-    print(analyze_res.json()["metrics"]["summary"])
+    print(analyze_res.json()["summary"], analyze_res.json()["metrics"])
     print("Mitigate status:", mitigate_res.status_code)
-    print("Before:", mitigate_res.json()["before"]["summary"])
-    print("After:", mitigate_res.json()["after"]["summary"])
+    print("Before:", mitigate_res.json()["before"])
+    print("After:", mitigate_res.json()["after"])
 
 
 if __name__ == "__main__":

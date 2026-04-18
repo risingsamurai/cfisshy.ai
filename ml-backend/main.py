@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from services.bias_metrics import compute_fairness_metrics
@@ -32,9 +34,20 @@ class MitigateRequest(AnalyzeRequest):
 
 
 app = FastAPI(title="LUMIS.AI ML Backend", version="1.0.0")
+logger = logging.getLogger("lumis.backend")
+logging.basicConfig(level=logging.INFO)
+
+
+def _risk_level(bias_detected: bool, bias_score: float) -> str:
+    if not bias_detected:
+        return "low"
+    if bias_score < 60:
+        return "high"
+    return "medium"
 
 
 def _run_analysis(payload: AnalyzeRequest) -> dict[str, Any]:
+    logger.info("analyze:start target=%s sensitive=%s", payload.target_column, payload.sensitive_attributes)
     frame = decode_csv_base64(payload.dataset_base64)
     prepared = prepare_dataset(
         frame=frame,
@@ -44,7 +57,9 @@ def _run_analysis(payload: AnalyzeRequest) -> dict[str, Any]:
         test_size=payload.test_size,
         random_state=payload.random_state,
     )
+    logger.info("analyze:model_training_start rows=%s", len(frame))
     model, predictions = train_or_use_model(prepared, payload.model_base64)
+    logger.info("analyze:model_training_end")
     fairness = compute_fairness_metrics(
         frame=prepared.frame,
         target_binary=prepared.target_binary.rename("label"),
@@ -60,21 +75,51 @@ def _run_analysis(payload: AnalyzeRequest) -> dict[str, Any]:
     )
 
     explanation = build_human_explanation(top_features, fairness["summary"])
+    summary_metrics = fairness["summary"]
+    bias_score = max(0.0, min(100.0, (1 - abs(summary_metrics["statistical_parity"])) * 100))
+    risk_level = _risk_level(summary_metrics["bias_detected"], float(bias_score))
+    recommendations = [
+        "Apply reweighing to reduce representation imbalance.",
+        "Review top proxy-like features and remove or regularize them.",
+        "Audit decision threshold by protected groups and recalibrate.",
+    ]
+
+    logger.info(
+        "analyze:end bias_detected=%s bias_score=%.2f", summary_metrics["bias_detected"], bias_score
+    )
     return {
-        "rows_analyzed": int(frame.shape[0]),
-        "columns_analyzed": int(frame.shape[1]),
-        "metrics": fairness,
-        "explainability": {
-            "top_features": top_features,
-            "human_explanation": explanation,
+        "summary": {
+            "bias_score": round(float(bias_score), 2),
+            "risk_level": risk_level,
+            "bias_detected": summary_metrics["bias_detected"],
+            "rows_analyzed": int(frame.shape[0]),
+            "columns_analyzed": int(frame.shape[1]),
         },
-        "bias_detected": fairness["summary"]["bias_detected"],
+        "metrics": {
+            "statistical_parity": summary_metrics["statistical_parity"],
+            "equal_opportunity": summary_metrics["equal_opportunity"],
+            "disparate_impact": summary_metrics["disparate_impact"],
+        },
+        "top_features": top_features,
+        "recommendations": recommendations,
+        "attribute_metrics": fairness["by_attribute"],
+        "explanation": explanation,
     }
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)})
+
+
+@app.exception_handler(ValueError)
+async def value_exception_handler(_: Request, exc: ValueError) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 @app.post("/analyze")
@@ -95,6 +140,7 @@ def mitigate(payload: MitigateRequest) -> dict[str, Any]:
             detail="Only 'reweighing' is currently implemented. Adversarial debiasing is scaffolded for future use.",
         )
     try:
+        logger.info("mitigate:start method=%s", payload.method.lower())
         frame = decode_csv_base64(payload.dataset_base64)
         prepared = prepare_dataset(
             frame=frame,
@@ -111,16 +157,42 @@ def mitigate(payload: MitigateRequest) -> dict[str, Any]:
             predictions=predictions_before,
             sensitive_attributes=payload.sensitive_attributes,
         )
+        logger.info("mitigate:reweighing_start")
         _, mitigation_result = mitigate_with_reweighing(prepared, model)
+        logger.info("mitigate:reweighing_end")
         after_metrics = mitigation_result["metrics"]
+        before_summary = before_metrics["summary"]
+        after_summary = after_metrics["summary"]
+        before_score = max(0.0, min(100.0, (1 - abs(before_summary["statistical_parity"])) * 100))
+        after_score = max(0.0, min(100.0, (1 - abs(after_summary["statistical_parity"])) * 100))
+        logger.info("mitigate:end improved=%s", after_score > before_score)
         return {
             "method": "reweighing",
-            "before": before_metrics,
-            "after": after_metrics,
-            "improved": (
-                abs(after_metrics["summary"]["statistical_parity"])
-                < abs(before_metrics["summary"]["statistical_parity"])
-            ),
+            "before": {
+                "summary": {
+                    "bias_score": round(float(before_score), 2),
+                    "bias_detected": before_summary["bias_detected"],
+                    "risk_level": _risk_level(before_summary["bias_detected"], float(before_score)),
+                },
+                "metrics": {
+                    "statistical_parity": before_summary["statistical_parity"],
+                    "equal_opportunity": before_summary["equal_opportunity"],
+                    "disparate_impact": before_summary["disparate_impact"],
+                },
+            },
+            "after": {
+                "summary": {
+                    "bias_score": round(float(after_score), 2),
+                    "bias_detected": after_summary["bias_detected"],
+                    "risk_level": _risk_level(after_summary["bias_detected"], float(after_score)),
+                },
+                "metrics": {
+                    "statistical_parity": after_summary["statistical_parity"],
+                    "equal_opportunity": after_summary["equal_opportunity"],
+                    "disparate_impact": after_summary["disparate_impact"],
+                },
+            },
+            "improved": after_score > before_score,
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
