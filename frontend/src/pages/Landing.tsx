@@ -7,7 +7,7 @@ import { Card } from "../components/ui/Card";
 import { firebaseEnabled } from "../services/firebase";
 
 export default function Landing() {
-  const nav = useNavigate();
+  const navigate = useNavigate();
   const { signInWithGoogle, user } = useAuth();
 
   return (
@@ -33,7 +33,7 @@ export default function Landing() {
       </motion.div>
       <div className="mt-8 flex gap-3">
         {user ? (
-          <Button onClick={() => nav("/dashboard")}>Go to Dashboard</Button>
+          <Button onClick={() => navigate("/dashboard")}>Go to Dashboard</Button>
         ) : (
           <Button
             onClick={() => {
@@ -47,7 +47,7 @@ export default function Landing() {
             Sign in with Google
           </Button>
         )}
-        <Button variant="ghost" onClick={() => nav("/audit/new?demo=1")}>
+        <Button variant="ghost" onClick={() => navigate('/audit/new?demo=1')}>
           Try Demo
         </Button>
       </div>

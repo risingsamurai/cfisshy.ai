@@ -19,6 +19,7 @@ export default function NewAudit() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const { setAnalysis, setLoading, setError } = useAuditStore();
+  const isDemo = searchParams.get('demo') === '1';
 
   const handleFile = (file: File) => {
     setLoadingStep("upload");
@@ -106,12 +107,18 @@ export default function NewAudit() {
   };
 
   useEffect(() => {
-    if (searchParams.get("demo") === "1") {
-      void loadDemoAndAnalyze();
+    if (isDemo) {
+      runDemoAnalysis()
     }
-    // run once on mount for demo deep-link
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isDemo])
+
+  async function runDemoAnalysis() {
+    const BASE_URL = import.meta.env.VITE_ANALYZER_BASE_URL || 'https://cfisshy-ai.onrender.com'
+    const response = await fetch(BASE_URL + '/analyze', {
+      method: 'POST',
+      // use the hiring_biased demo dataset
+    })
+  }
 
   return (
     <div className="space-y-4">
