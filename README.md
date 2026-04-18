@@ -48,3 +48,7 @@ Bias detection and fairness auditing platform for AI/ML systems, built for Googl
    - Gemini-powered `Ask FairLens AI` panel
 4. Compare before/after in `/compare`.
 5. Run what-if simulation in `/playground`.
+
+## Repository note
+
+- Synced and maintained from local development workspace.
