@@ -9,8 +9,8 @@ export interface AnalyzePayload {
 }
 
 async function postJson<T>(path: string, payload: object): Promise<T> {
-  const baseUrl = (import.meta.env.VITE_ANALYZER_BASE_URL as string | undefined) ?? "http://127.0.0.1:8081";
-  const response = await fetch(`${baseUrl}${path}`, {
+  const BASE_URL = import.meta.env.VITE_ANALYZER_BASE_URL ?? "https://cfisshy-ai.onrender.com";
+  const response = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

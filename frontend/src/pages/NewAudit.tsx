@@ -67,11 +67,34 @@ export default function NewAudit() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/demo-datasets/hiring_biased.csv");
+      // Step 1: Uploading dataset...
+      setLoadingStep("upload");
+      toast.loading("Uploading dataset...");
+      
+      const res = await fetch("/public/demo-datasets/hiring_biased.csv");
+      if (!res.ok) {
+        throw new Error("Failed to load demo dataset");
+      }
+      
+      // Step 2: Parsing dataset
+      setLoadingStep("parse");
       const csvText = await res.text();
       setRawCsv(csvText);
       const parsed = Papa.parse<Record<string, string>>(csvText, { header: true });
       setRows(parsed.data.slice(0, 10));
+      
+      // Step 3: Analyzing fairness...
+      setLoadingStep("detect");
+      toast.loading("Analyzing fairness...");
+      
+      // Step 4: Detecting proxy variables...
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing
+      toast.loading("Detecting proxy variables...");
+      
+      // Step 5: Generating report...
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing
+      toast.loading("Generating report...");
+      
       setLoadingStep("ready");
       await runAnalyze(csvText);
     } catch (error) {
