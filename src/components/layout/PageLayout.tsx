@@ -5,6 +5,7 @@ import { Button } from "../ui/Button";
 
 const links = [
   ["/dashboard", "Dashboard"],
+  ["/history", "Audit History"],
   ["/audit/new", "New Audit"],
   ["/playground", "Playground"],
   ["/compare", "Compare"],

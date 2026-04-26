@@ -1,14 +1,12 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import { useAuth } from "../hooks/useAuth";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { firebaseEnabled } from "../services/firebase";
 
 export default function Landing() {
   const nav = useNavigate();
-  const { signInWithGoogle, user } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -35,16 +33,8 @@ export default function Landing() {
         {user ? (
           <Button onClick={() => nav("/dashboard")}>Go to Dashboard</Button>
         ) : (
-          <Button
-            onClick={() => {
-              if (!firebaseEnabled) {
-                toast("Add Firebase env vars to enable Google Sign-In.");
-                return;
-              }
-              void signInWithGoogle();
-            }}
-          >
-            Sign in with Google
+          <Button onClick={() => nav("/auth")}>
+            Sign In / Sign Up
           </Button>
         )}
         <Button variant="ghost" onClick={() => nav("/audit/new")}>

@@ -9,10 +9,16 @@ import AuditReport from "./pages/AuditReport";
 import Playground from "./pages/Playground";
 import Compare from "./pages/Compare";
 import Settings from "./pages/Settings";
+import Auth from "./pages/Auth";
+import AuditHistory from "./pages/AuditHistory";
 import { Skeleton } from "./components/ui/Skeleton";
+
+// 🔥 ADD THIS
+import { firebaseEnabled } from "./lib/firebase";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
+
   if (loading) {
     return (
       <div className="space-y-3 p-8">
@@ -21,17 +27,25 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
       </div>
     );
   }
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
+
   return children;
 }
 
 export default function App() {
+
+  // 🔥 DEBUG CHECK (runs once)
+  console.log("🔥 Firebase Enabled (App):", firebaseEnabled);
+
   return (
     <>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/auth" element={<Auth />} />
+
         <Route
           element={
             <ProtectedRoute>
@@ -45,9 +59,12 @@ export default function App() {
           <Route path="/playground" element={<Playground />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/history" element={<AuditHistory />} />
         </Route>
       </Routes>
+
       <Toaster position="top-right" />
     </>
   );
 }
+

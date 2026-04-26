@@ -1,70 +1,37 @@
-import {
-  type PropsWithChildren,
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState
-} from "react";
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  type User
-} from "firebase/auth";
-import { auth, firebaseEnabled, googleProvider } from "../services/firebase";
-
-interface AuthContextValue {
-  user: User | null;
-  loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { useEffect, type PropsWithChildren } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, firebaseEnabled } from "../lib/firebase";
+import { useAuthStore } from "../store/authStore";
+import { authService } from "../services/authService";
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(firebaseEnabled);
+  const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
-    if (!auth) {
+    if (!auth || !firebaseEnabled) {
       setLoading(false);
       return;
     }
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
       setLoading(false);
     });
-  }, []);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      loading,
-      signInWithGoogle: async () => {
-        if (!auth || !firebaseEnabled) {
-          throw new Error("Firebase is not configured. Add VITE_FIREBASE_* values to .env.");
-        }
-        await signInWithPopup(auth, googleProvider);
-      },
-      logout: async () => {
-        if (!auth) {
-          return;
-        }
-        await signOut(auth);
-      }
-    }),
-    [loading, user]
-  );
+    return () => unsubscribe();
+  }, [setUser, setLoading]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <>{children}</>;
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return ctx;
+  const { user, loading } = useAuthStore();
+  return {
+    user,
+    loading,
+    login: authService.login,
+    signup: authService.signUp,
+    signInWithGoogle: authService.signInWithGoogle,
+    logout: authService.logout,
+  };
 }
