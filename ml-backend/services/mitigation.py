@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import io
 from copy import deepcopy
 from typing import Any
 
@@ -69,8 +71,8 @@ def mitigate_with_reweighing(
     for attribute in prepared.sensitive_attributes:
         dataset, privileged = _binary_dataset_for_reweighing(prepared, attribute)
         rw = Reweighing(
-            unprivileged_groups=[{attribute: 0}],
-            privileged_groups=[{attribute: 1}],
+            unprivileged_groups=[{attribute: 0.0}],
+            privileged_groups=[{attribute: 1.0}],
         )
         try:
             transformed = rw.fit_transform(dataset)
@@ -81,6 +83,8 @@ def mitigate_with_reweighing(
                 f"Ensure all columns are converted to numerical values before calling this function."
             ) from exc
         sample_weight = sample_weight * transformed.instance_weights
+        # Safety cap to prevent 'Out of Range' errors from extremely small subgroups
+        sample_weight = np.clip(sample_weight, 0.1, 10.0)
         privileged_map[attribute] = float(privileged)
 
     try:
@@ -99,3 +103,15 @@ def mitigate_with_reweighing(
         sensitive_attributes=prepared.sensitive_attributes,
     )
     return mitigated_predictions, {"metrics": metrics_after, "privileged_map": privileged_map}
+
+
+def create_mitigated_dataset_base64(
+    prepared: PreparedDataset, mitigated_predictions: np.ndarray
+) -> str:
+    """Create a CSV string of the original dataframe with mitigated predictions and encode as base64."""
+    mitigated_frame = prepared.frame.copy()
+    mitigated_frame["mitigated_prediction"] = mitigated_predictions
+    csv_buffer = io.StringIO()
+    mitigated_frame.to_csv(csv_buffer, index=False)
+    csv_str = csv_buffer.getvalue()
+    return base64.b64encode(csv_str.encode()).decode()

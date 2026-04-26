@@ -97,9 +97,20 @@ def _attribute_metrics(
         privileged_groups=[{"sensitive_binary": 1}],
     )
 
-    statistical_parity = float(metric_pred.statistical_parity_difference())
-    equal_opportunity = float(metric_cls.equal_opportunity_difference())
-    disparate_impact = float(metric_pred.disparate_impact())
+    try:
+        statistical_parity = float(metric_pred.statistical_parity_difference())
+    except ZeroDivisionError:
+        statistical_parity = 0.0
+    
+    try:
+        equal_opportunity = float(metric_cls.equal_opportunity_difference())
+    except ZeroDivisionError:
+        equal_opportunity = 0.0
+    
+    try:
+        disparate_impact = float(metric_pred.disparate_impact())
+    except ZeroDivisionError:
+        disparate_impact = 1.0
     bias_detected = (
         abs(statistical_parity) > 0.1 or abs(equal_opportunity) > 0.1 or disparate_impact < 0.8
     )

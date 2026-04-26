@@ -30,3 +30,57 @@ Write in plain English for a non-technical HR manager or compliance officer.`;
   const result = await model.generateContent(prompt);
   return result.response.text();
 }
+
+export interface MitigationExplanationInput {
+  beforeFairnessScore: number;
+  afterFairnessScore: number;
+  beforeDisparateImpact: number;
+  afterDisparateImpact: number;
+  beforeStatisticalParity: number;
+  afterStatisticalParity: number;
+  protectedAttribute: string;
+  improvement: number;
+}
+
+export async function generateMitigationExplanation(input: MitigationExplanationInput): Promise<string> {
+  // Handle nulls or empty metrics with safe defaults
+  const beforeFairnessScore = input.beforeFairnessScore ?? 0;
+  const afterFairnessScore = input.afterFairnessScore ?? 0;
+  const beforeDisparateImpact = input.beforeDisparateImpact ?? 0;
+  const afterDisparateImpact = input.afterDisparateImpact ?? 0;
+  const beforeStatisticalParity = input.beforeStatisticalParity ?? 0;
+  const afterStatisticalParity = input.afterStatisticalParity ?? 0;
+  const improvement = input.improvement ?? 0;
+
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+  const prompt = `You are an AI fairness expert. Explain the results of applying the Reweighing bias mitigation algorithm in 3-4 concise bullet points. Use the specific numbers provided. Keep it under 150 words.
+
+Before Mitigation:
+- Fairness Score: ${beforeFairnessScore}/100
+- Disparate Impact: ${beforeDisparateImpact}
+- Statistical Parity: ${beforeStatisticalParity}
+
+After Mitigation:
+- Fairness Score: ${afterFairnessScore}/100
+- Disparate Impact: ${afterDisparateImpact}
+- Statistical Parity: ${afterStatisticalParity}
+
+Protected Attribute: ${input.protectedAttribute}
+Overall Improvement: +${improvement} points
+
+IMPORTANT: End your response with two specific sections:
+1. **Verdict:** A clear statement about whether the model is now safe for deployment (e.g., "This model is now safe for deployment" or "This model requires further improvement")
+2. **Legal Note:** A compliance statement referencing the 80% rule for Disparate Impact (e.g., "Complies with 80% rule for Disparate Impact" or "Does not comply with 80% rule for Disparate Impact")
+
+Explain what changed and why the model is now fairer. Write in plain English for a non-technical audience.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("Gemini API error:", error);
+    // Friendly fallback message
+    return `The Reweighing algorithm improved fairness by +${improvement} points. Disparate Impact changed from ${beforeDisparateImpact} to ${afterDisparateImpact}. ${afterDisparateImpact >= 0.8 ? "The model now complies with the 80% rule and is safer for deployment." : "The model requires further improvement to meet compliance standards."}`;
+  }
+}

@@ -18,6 +18,8 @@ interface AnalysisState {
   mitigation: MitigationResult | null;
   error: string | null;
   progress: number;
+  rowCount: number;
+  enableSampling: boolean;
 }
 
 export function useAnalysis() {
@@ -31,6 +33,8 @@ export function useAnalysis() {
     mitigation: null,
     error: null,
     progress: 0,
+    rowCount: 0,
+    enableSampling: false,
   });
 
   const parseCSVColumns = (text: string): string[] => {
@@ -39,6 +43,24 @@ export function useAnalysis() {
       .split(",")
       .map(c => c.trim().replace(/"/g, "").replace(/\r/g, ""))
       .filter(Boolean);
+  };
+
+  const countCSVRows = (text: string): number => {
+    const lines = text.split("\n").filter(l => l.trim());
+    return Math.max(0, lines.length - 1); // Exclude header
+  };
+
+  const sampleCSV = (text: string, sampleSize: number = 10000): string => {
+    const lines = text.split("\n").filter(l => l.trim());
+    if (lines.length <= sampleSize + 1) return text; // Don't sample if already small
+    
+    const header = lines[0];
+    const dataLines = lines.slice(1);
+    const sampled = dataLines
+      .sort(() => Math.random() - 0.5)
+      .slice(0, sampleSize);
+    
+    return [header, ...sampled].join("\n");
   };
 
   const parseColumnValues = (text: string, column: string): string[] => {
@@ -59,6 +81,7 @@ export function useAnalysis() {
     reader.onload = async (e) => {
       const text = e.target?.result as string;
       const columns = parseCSVColumns(text);
+      const rowCount = countCSVRows(text);
 
       // Auto-detect schema
       const schema = detectSchema(columns);
@@ -75,6 +98,8 @@ export function useAnalysis() {
           result: null,
           mitigation: null,
           error: null,
+          rowCount,
+          enableSampling: rowCount > 30000,
         }));
         return;
       }
@@ -99,11 +124,17 @@ export function useAnalysis() {
         mitigation: null,
         error: null,
         progress: 0,
+        rowCount,
+        enableSampling: rowCount > 30000,
       }));
 
       // Trigger analysis
       try {
-        const base64 = await fileToBase64(file);
+        const csvText = rowCount > 30000 && state.enableSampling ? sampleCSV(text, 10000) : text;
+        const blob = new Blob([csvText], { type: "text/csv" });
+        const sampledFile = new File([blob], file.name, { type: "text/csv" });
+        const base64 = await fileToBase64(sampledFile);
+        
         const fullRequest: AnalyzeRequest = {
           datasetBase64: base64,
           targetColumn: schema.targetColumn,
@@ -130,7 +161,7 @@ export function useAnalysis() {
     };
     reader.onerror = () => toast.error("Failed to read file");
     reader.readAsText(file);
-  }, []);
+  }, [state.enableSampling]);
 
   const loadColumnValues = useCallback((column: string) => {
     if (!state.file) return;
@@ -148,6 +179,10 @@ export function useAnalysis() {
 
   const setConfig = useCallback((key: keyof AnalyzeRequest, value: any) => {
     setState(s => ({ ...s, request: { ...s.request, [key]: value } }));
+  }, []);
+
+  const setEnableSampling = useCallback((enabled: boolean) => {
+    setState(s => ({ ...s, enableSampling: enabled }));
   }, []);
 
   const runAnalysis = useCallback(async () => {
@@ -220,6 +255,7 @@ export function useAnalysis() {
     setState({
       step: "idle", file: null, csvColumns: [], columnValues: {},
       request: {}, result: null, mitigation: null, error: null, progress: 0,
+      rowCount: 0, enableSampling: false,
     });
   }, []);
 
@@ -293,5 +329,5 @@ export function useAnalysis() {
     }
   }, []);
 
-  return { state, loadFile, loadColumnValues, setConfig, runAnalysis, runMitigation, reset, loadDemoDataset };
+  return { state, loadFile, loadColumnValues, setConfig, runAnalysis, runMitigation, reset, loadDemoDataset, setEnableSampling };
 }

@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { useAnalysis } from "../hooks/useAnalysis";
 import { AnalysisResult, MitigationResult } from "../services/api";
+import { generateMitigationExplanation } from "../services/geminiReport";
 
 export function BiasAnalysisDashboard() {
-  const { state, loadFile, setConfig, runAnalysis, runMitigation, reset, loadDemoDataset } = useAnalysis();
+  const { state, loadFile, setConfig, runAnalysis, runMitigation, reset, loadDemoDataset, setEnableSampling } = useAnalysis();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -127,7 +128,7 @@ export function BiasAnalysisDashboard() {
 
   // ── Step 2.5: Fallback Configuration (only when auto-detection fails) ──────────
   if (state.step === "configuring") {
-    const { csvColumns, request } = state;
+    const { csvColumns, request, rowCount } = state;
 
     return (
       <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-sm z-50 
@@ -173,6 +174,29 @@ export function BiasAnalysisDashboard() {
                   .map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+
+            {rowCount > 30000 && (
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-blue-300 text-sm font-medium">
+                    Sample 10k rows for faster analysis
+                  </label>
+                  <button
+                    onClick={() => setEnableSampling(!state.enableSampling)}
+                    className={`w-12 h-6 rounded-full transition-colors ${
+                      state.enableSampling ? 'bg-emerald-500' : 'bg-gray-600'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                      state.enableSampling ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  Dataset has {rowCount.toLocaleString()} rows. Sampling maintains statistical significance while reducing analysis time.
+                </p>
+              </div>
+            )}
 
             <button
               onClick={runAnalysis}
@@ -256,6 +280,31 @@ function BiasReport({
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
 }) {
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
+
+  const regenerateExplanation = () => {
+    if (!mitigation) return;
+    setLoadingExplanation(true);
+    generateMitigationExplanation({
+      beforeFairnessScore: mitigation.before.fairnessScore,
+      afterFairnessScore: mitigation.after.fairnessScore,
+      beforeDisparateImpact: mitigation.before.disparateImpact,
+      afterDisparateImpact: mitigation.after.disparateImpact,
+      beforeStatisticalParity: mitigation.before.statisticalParity,
+      afterStatisticalParity: mitigation.after.statisticalParity,
+      protectedAttribute: result.sensitiveAttribute,
+      improvement: mitigation.improvement,
+    })
+      .then(setAiExplanation)
+      .catch(() => setAiExplanation("Unable to generate AI explanation."))
+      .finally(() => setLoadingExplanation(false));
+  };
+
+  // Generate AI explanation after mitigation is done
+  if (mitigation && !aiExplanation && !loadingExplanation) {
+    regenerateExplanation();
+  }
   const LEVEL_CONFIG = {
     none:     { color: "emerald", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", label: "No Bias Detected",    emoji: "✅" },
     low:      { color: "blue",    bg: "bg-blue-500/10",    border: "border-blue-500/30",    text: "text-blue-400",    label: "Low Bias",             emoji: "🟡" },
@@ -456,41 +505,140 @@ function BiasReport({
           </button>
         </div>
       ) : (
-        <div className="bg-gray-800/40 rounded-2xl border border-emerald-700/30 p-5">
-          <h3 className="text-emerald-400 font-semibold text-sm mb-4">
-            ✅ Mitigation Complete — Reweighing Algorithm Applied
-          </h3>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Fairness Score",   before: mitigation.before.fairnessScore,   after: mitigation.after.fairnessScore,   suffix: "/100", higherBetter: true },
-              { label: "Disparate Impact", before: mitigation.before.disparateImpact, after: mitigation.after.disparateImpact, suffix: "",     higherBetter: true },
-              { label: "Stat. Parity",     before: Math.abs(mitigation.before.statisticalParity), after: Math.abs(mitigation.after.statisticalParity), suffix: "", higherBetter: false },
-            ].map(m => {
-              const improved = m.higherBetter ? m.after > m.before : m.after < m.before;
-              return (
-                <div key={m.label} className="text-center">
-                  <p className="text-gray-500 text-xs mb-2">{m.label}</p>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-gray-500 text-lg">{typeof m.before === "number" ? m.before.toFixed(2) : m.before}{m.suffix}</span>
-                    <span className="text-gray-600">→</span>
-                    <span className={`text-lg font-bold ${improved ? "text-emerald-400" : "text-red-400"}`}>
-                      {typeof m.after === "number" ? m.after.toFixed(2) : m.after}{m.suffix}
+        <>
+          {/* AI Reasoning Card */}
+          {aiExplanation && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-2xl border border-purple-500/30 p-5"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🧠</span>
+                  <h3 className="text-purple-300 font-semibold text-sm">AI-Powered Explanation</h3>
+                </div>
+                {aiExplanation === "Unable to generate AI explanation." && (
+                  <button
+                    onClick={regenerateExplanation}
+                    disabled={loadingExplanation}
+                    className="px-3 py-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs rounded-lg transition-colors"
+                  >
+                    {loadingExplanation ? "Retrying..." : "Retry"}
+                  </button>
+                )}
+              </div>
+              <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                {aiExplanation}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Algorithm Info Card */}
+          <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">ℹ️</span>
+              <h3 className="text-white font-semibold text-sm">How Reweighing Works</h3>
+            </div>
+            <p className="text-gray-400 text-xs leading-relaxed">
+              Reweighing assigns higher weights to underrepresented groups who received positive outcomes, 
+              and lower weights to overrepresented groups. This balances the training data so the model 
+              learns to make fairer predictions without changing the underlying algorithm. The weights 
+              are applied during model training, effectively giving more importance to examples that 
+              would otherwise be overlooked.
+            </p>
+          </div>
+
+          {/* Metrics Comparison */}
+          <div className="bg-gray-800/40 rounded-2xl border border-emerald-700/30 p-5">
+            <h3 className="text-emerald-400 font-semibold text-sm mb-4">
+              ✅ Mitigation Complete — Reweighing Algorithm Applied
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Fairness Score",   before: mitigation.before.fairnessScore,   after: mitigation.after.fairnessScore,   suffix: "/100", higherBetter: true },
+                { label: "Disparate Impact", before: mitigation.before.disparateImpact, after: mitigation.after.disparateImpact, suffix: "",     higherBetter: true },
+                { label: "Stat. Parity",     before: Math.abs(mitigation.before.statisticalParity), after: Math.abs(mitigation.after.statisticalParity), suffix: "", higherBetter: false },
+              ].map(m => {
+                const improved = m.higherBetter ? m.after > m.before : m.after < m.before;
+                return (
+                  <div key={m.label} className="text-center">
+                    <p className="text-gray-500 text-xs mb-2">{m.label}</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-gray-500 text-lg">{typeof m.before === "number" ? m.before.toFixed(2) : m.before}{m.suffix}</span>
+                      <span className="text-gray-600">→</span>
+                      <span className={`text-lg font-bold ${improved ? "text-emerald-400" : "text-red-400"}`}>
+                        {typeof m.after === "number" ? m.after.toFixed(2) : m.after}{m.suffix}
+                      </span>
+                    </div>
+                    <span className={`text-xs ${improved ? "text-emerald-500" : "text-gray-500"}`}>
+                      {improved ? "▲ Improved" : "▼ Unchanged"}
                     </span>
                   </div>
-                  <span className={`text-xs ${improved ? "text-emerald-500" : "text-gray-500"}`}>
-                    {improved ? "▲ Improved" : "▼ Unchanged"}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <div className="mt-4 text-center">
+              <span className="text-emerald-400 font-semibold text-lg">
+                +{mitigation.improvement} point improvement
+              </span>
+              <span className="text-gray-500 text-xs ml-2">in overall fairness score</span>
+            </div>
           </div>
-          <div className="mt-4 text-center">
-            <span className="text-emerald-400 font-semibold text-lg">
-              +{mitigation.improvement} point improvement
-            </span>
-            <span className="text-gray-500 text-xs ml-2">in overall fairness score</span>
+
+          {/* Sample Comparison Table */}
+          <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5">
+            <h3 className="text-white font-semibold text-sm mb-4">Sample Prediction Changes</h3>
+            <p className="text-gray-500 text-xs mb-3">
+              The table below shows how predictions changed for 5 sample rows after mitigation.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-700">
+                    <th className="text-left py-2 px-2">Row</th>
+                    <th className="text-left py-2 px-2">{result.sensitiveAttribute}</th>
+                    <th className="text-center py-2 px-2">Before</th>
+                    <th className="text-center py-2 px-2">After</th>
+                    <th className="text-center py-2 px-2">Change</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-300">
+                  {[
+                    { row: 1, attr: "Group A", before: 0, after: 1 },
+                    { row: 2, attr: "Group B", before: 1, after: 1 },
+                    { row: 3, attr: "Group A", before: 0, after: 0 },
+                    { row: 4, attr: "Group B", before: 1, after: 0 },
+                    { row: 5, attr: "Group A", before: 0, after: 1 },
+                  ].map((row, i) => {
+                    const changed = row.before !== row.after;
+                    const improved = row.after === 1;
+                    return (
+                      <tr key={i} className="border-b border-gray-800 last:border-0">
+                        <td className="py-2 px-2">{row.row}</td>
+                        <td className="py-2 px-2">{row.attr}</td>
+                        <td className="text-center py-2 px-2">{row.before}</td>
+                        <td className="text-center py-2 px-2">{row.after}</td>
+                        <td className="text-center py-2 px-2">
+                          {changed ? (
+                            <span className={improved ? "text-emerald-400" : "text-amber-400"}>
+                              {improved ? "↑" : "↓"}
+                            </span>
+                          ) : (
+                            <span className="text-gray-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-gray-600 text-xs mt-3 italic">
+              * This is a simulated example. Actual row-level changes depend on your dataset.
+            </p>
           </div>
-        </div>
+        </>
       )}
 
     {/* Settings Modal */}

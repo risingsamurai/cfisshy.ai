@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import gc
 from typing import Any
 import pandas as pd
 import numpy as np
@@ -15,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from services.bias_metrics import compute_fairness_metrics
 from services.explainability import build_human_explanation, compute_top_feature_impacts
-from services.mitigation import mitigate_with_reweighing
+from services.mitigation import create_mitigated_dataset_base64, mitigate_with_reweighing
 from services.model_handler import (
     decode_csv_base64,
     get_transformed_features,
@@ -64,9 +65,18 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     le = LabelEncoder()
     for col in text_columns:
         df[col] = le.fit_transform(df[col].astype(str))
+    
+    # 3. Replace infinity values with NaN
+    df = df.replace([np.inf, -np.inf], np.nan)
+    
+    # 4. Fill any NaN values that resulted from infinity replacement
+    df = df.fillna(0)
+    
+    # 5. Final safety check: ensure all values are numeric
+    df = df.apply(pd.to_numeric, errors='coerce').fillna(0)
             
-    # 3. Force all values to float64 for math operations
-    return df.astype(np.float64)
+    # 6. Force all values to float32 for memory efficiency
+    return df.astype(np.float32)
 
 def _risk_level(bias_detected: bool, bias_score: float) -> str:
     if not bias_detected:
@@ -86,6 +96,13 @@ def _run_analysis(payload: AnalyzeRequest) -> dict[str, Any]:
     frame = preprocess_dataframe(raw_frame)
     
     print(f"DEBUG: Preprocessed DataFrame head:\n{frame.head()}")
+    
+    # Verify that target_column and sensitive_attributes exist in preprocessed dataframe
+    if payload.target_column not in frame.columns:
+        raise ValueError(f"Target column '{payload.target_column}' not found in dataset columns: {list(frame.columns)}")
+    for attr in payload.sensitive_attributes:
+        if attr not in frame.columns:
+            raise ValueError(f"Sensitive attribute '{attr}' not found in dataset columns: {list(frame.columns)}")
 
     prepared = prepare_dataset(
         frame=frame,
@@ -168,6 +185,13 @@ async def mitigate(payload: MitigateRequest):
         frame = preprocess_dataframe(raw_frame)
         
         print(f"DEBUG: Preprocessed DataFrame head:\n{frame.head()}")
+        
+        # Verify that target_column and sensitive_attributes exist in preprocessed dataframe
+        if payload.target_column not in frame.columns:
+            raise ValueError(f"Target column '{payload.target_column}' not found in dataset columns: {list(frame.columns)}")
+        for attr in payload.sensitive_attributes:
+            if attr not in frame.columns:
+                raise ValueError(f"Sensitive attribute '{attr}' not found in dataset columns: {list(frame.columns)}")
 
         prepared = prepare_dataset(
             frame=frame,
@@ -189,7 +213,14 @@ async def mitigate(payload: MitigateRequest):
 
         # Apply Mitigation
         logger.info("mitigate:reweighing_start")
-        _, mitigation_result = mitigate_with_reweighing(prepared, model)
+        mitigated_predictions, mitigation_result = mitigate_with_reweighing(prepared, model)
+        
+        # Create mitigated dataset as base64 for download
+        mitigated_dataset_base64 = create_mitigated_dataset_base64(prepared, mitigated_predictions)
+        
+        # Free memory for large datasets
+        del frame
+        gc.collect()
         
         after_metrics = mitigation_result["metrics"]
         before_summary = before_fairness["summary"]
@@ -218,6 +249,7 @@ async def mitigate(payload: MitigateRequest):
                 "metrics": after_summary
             },
             "improved": after_score > before_score,
+            "mitigated_dataset_base64": mitigated_dataset_base64,
         }
 
     except Exception as exc:
