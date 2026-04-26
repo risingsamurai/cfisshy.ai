@@ -60,7 +60,7 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.fillna(0)
     
     # 2. Encode all text/object columns to numbers using select_dtypes
-    text_columns = df.select_dtypes(exclude=[np.number]).columns
+    text_columns = df.select_dtypes(include=['object', 'category']).columns
     le = LabelEncoder()
     for col in text_columns:
         df[col] = le.fit_transform(df[col].astype(str))
@@ -84,6 +84,8 @@ def _run_analysis(payload: AnalyzeRequest) -> dict[str, Any]:
     # Load and Preprocess
     raw_frame = decode_csv_base64(payload.dataset_base64)
     frame = preprocess_dataframe(raw_frame)
+    
+    print(f"DEBUG: Preprocessed DataFrame head:\n{frame.head()}")
 
     prepared = prepare_dataset(
         frame=frame,
@@ -164,6 +166,8 @@ async def mitigate(payload: MitigateRequest):
         # Load and Preprocess
         raw_frame = decode_csv_base64(payload.dataset_base64)
         frame = preprocess_dataframe(raw_frame)
+        
+        print(f"DEBUG: Preprocessed DataFrame head:\n{frame.head()}")
 
         prepared = prepare_dataset(
             frame=frame,
