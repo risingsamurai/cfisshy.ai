@@ -1,20 +1,9 @@
-
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { useAuth } from "./hooks/useAuth";
-import { PageLayout } from "./components/layout/PageLayout";
 import Landing from "./pages/Landing";
-import Dashboard from "./pages/Dashboard";
-import NewAudit from "./pages/NewAudit";
-import AuditReport from "./pages/AuditReport";
-import Playground from "./pages/Playground";
-import Compare from "./pages/Compare";
-import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
-import AuditHistory from "./pages/AuditHistory";
 import { Skeleton } from "./components/ui/Skeleton";
-
-// 🔥 ADD THIS
 import { firebaseEnabled } from "./lib/firebase";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -37,13 +26,10 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
-
-  // 🔥 DEBUG CHECK (runs once)
   console.log("🔥 Firebase Enabled (App):", firebaseEnabled);
 
   return (
     <>
-      {/* Skip to main content link for keyboard users */}
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 
@@ -54,28 +40,22 @@ export default function App() {
         Skip to main content
       </a>
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/auth" element={<Auth />} />
-
+        <Route path="/" element={<Auth />} />
+        
         <Route
+          path="/app"
           element={
             <ProtectedRoute>
-              <PageLayout />
+              <Landing />
             </ProtectedRoute>
           }
-        >
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/audit/new" element={<NewAudit />} />
-          <Route path="/audit/:id" element={<AuditReport />} />
-          <Route path="/playground" element={<Playground />} />
-          <Route path="/compare" element={<Compare />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/history" element={<AuditHistory />} />
-        </Route>
+        />
+
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       <Toaster position="top-right" />
     </>
   );
 }
-

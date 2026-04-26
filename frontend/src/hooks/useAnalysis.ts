@@ -4,6 +4,8 @@ import {
   AnalysisResult, MitigationResult, AnalyzeRequest,
   detectSchema, detectPositiveLabelValue
 } from "../services/api";
+import { useAuth } from "./useAuth";
+import { firestoreService } from "../services/firestoreService";
 import toast from "react-hot-toast";
 
 export type AnalysisStep = "idle" | "uploading" | "configuring" | "analyzing" | "done" | "error";
@@ -23,6 +25,7 @@ interface AnalysisState {
 }
 
 export function useAnalysis() {
+  const { user } = useAuth();
   const [state, setState] = useState<AnalysisState>({
     step: "idle",
     file: null,
@@ -145,6 +148,19 @@ export function useAnalysis() {
 
         const result = await analyzeDataset(fullRequest);
 
+        if (user) {
+          try {
+            await firestoreService.saveAudit({
+              userId: user.uid,
+              datasetName: file.name,
+              result
+            });
+            console.log("Audit saved to Firebase.");
+          } catch (e) {
+            console.error("Failed to save audit to Firebase:", e);
+          }
+        }
+
         setState(s => ({
           ...s,
           step: "done",
@@ -213,6 +229,19 @@ export function useAnalysis() {
 
       const result = await analyzeDataset(fullRequest);
       clearInterval(progressInterval);
+
+      if (user) {
+        try {
+          await firestoreService.saveAudit({
+            userId: user.uid,
+            datasetName: file.name,
+            result
+          });
+          console.log("Audit saved to Firebase.");
+        } catch (e) {
+          console.error("Failed to save audit to Firebase:", e);
+        }
+      }
 
       setState(s => ({
         ...s,
@@ -314,6 +343,19 @@ export function useAnalysis() {
 
       const result = await analyzeDataset(fullRequest);
       clearInterval(progressInterval);
+
+      if (user) {
+        try {
+          await firestoreService.saveAudit({
+            userId: user.uid,
+            datasetName: `${id}_demo.csv`,
+            result
+          });
+          console.log("Audit saved to Firebase.");
+        } catch (e) {
+          console.error("Failed to save audit to Firebase:", e);
+        }
+      }
 
       setState(s => ({
         ...s,

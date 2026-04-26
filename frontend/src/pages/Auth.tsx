@@ -25,7 +25,7 @@ export default function Auth() {
         await signup(email, password);
         toast.success("Account created successfully");
       }
-      nav("/dashboard");
+      nav("/app");
     } catch (error: any) {
       toast.error(error.message || "An error occurred");
     } finally {
@@ -37,7 +37,7 @@ export default function Auth() {
     try {
       await signInWithGoogle();
       toast.success("Logged in with Google");
-      nav("/dashboard");
+      nav("/app");
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in with Google");
     }

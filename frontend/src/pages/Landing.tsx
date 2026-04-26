@@ -1,11 +1,7 @@
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import { useRef } from "react";
 
 import { useAuth } from "../hooks/useAuth";
-import { Button } from "../components/ui/Button";
-import { firebaseEnabled } from "../services/firebase";
 import { BiasAnalysisDashboard } from "../components/BiasAnalysisDashboard";
 
 const fadeUp = {
@@ -22,8 +18,7 @@ const fadeUp = {
 };
 
 export default function Landing() {
-  const navigate = useNavigate();
-  const { signInWithGoogle, user } = useAuth();
+  const { logout, user } = useAuth();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -41,9 +36,25 @@ export default function Landing() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-brand-bg text-white">
+      {/* Auth Header */}
+      <div className="sticky top-0 z-50 flex items-center justify-between bg-brand-bg/80 px-6 py-4 backdrop-blur-md border-b border-white/10">
+        <div className="font-bold tracking-widest text-white">LUMIS.AI</div>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-white/50 hidden md:block">
+            {user?.email || "Auditor"}
+          </span>
+          <button
+            onClick={() => void logout()}
+            className="text-sm font-medium text-white/60 hover:text-white transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+
       {/* SDG Banner */}
       <div
-        className="sticky top-0 z-50"
+        className="relative z-40"
         style={{ background: "linear-gradient(to right, #1a1a2e, #16213e)" }}
       >
         <div className="flex items-center justify-center px-4 py-2 text-xs text-white/70">
@@ -53,7 +64,7 @@ export default function Landing() {
 
       {/* HERO */}
       <section
-        className="relative flex min-h-screen flex-col items-center justify-end overflow-hidden px-4 pb-20 text-center"
+        className="relative flex min-h-screen flex-col items-center justify-end overflow-hidden px-4 pb-20 text-center -mt-[100px]"
         onMouseMove={handleMouseMove}
       >
         {/* Robot Background */}
@@ -111,35 +122,13 @@ export default function Landing() {
           custom={3}
           className="relative z-10 mt-10 flex flex-wrap items-center justify-center gap-4"
         >
-          {user ? (
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="flex h-12 items-center justify-center border border-white/20 bg-white/10 px-8 text-sm font-medium uppercase tracking-[0.15em] text-white backdrop-blur-md transition-all hover:border-white/40 hover:bg-white/20"
-            >
-              Dashboard Access
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                if (!firebaseEnabled) {
-                  toast("Add Firebase env vars to enable Google Sign-In.");
-                  return;
-                }
-                void signInWithGoogle();
-              }}
-              className="flex h-12 items-center justify-center border border-white/20 bg-white/10 px-8 text-sm font-medium uppercase tracking-[0.15em] text-white backdrop-blur-md transition-all hover:border-white/40 hover:bg-white/20"
-            >
-              Sign in with Google
-            </button>
-          )}
-
           <button
             onClick={() => {
               document.getElementById("analysis")?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="flex h-12 items-center justify-center border border-transparent px-8 text-sm font-medium uppercase tracking-[0.15em] text-white/60 transition-all hover:bg-white/5 hover:text-white"
+            className="flex h-12 items-center justify-center border border-white/20 bg-white/10 px-8 text-sm font-medium uppercase tracking-[0.15em] text-white backdrop-blur-md transition-all hover:border-white/40 hover:bg-white/20"
           >
-            Try Demo
+            Start Audit
           </button>
         </motion.div>
 

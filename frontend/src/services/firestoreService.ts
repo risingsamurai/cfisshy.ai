@@ -1,32 +1,13 @@
 import { db } from "../lib/firebase";
 import { addDoc, collection, Timestamp, query, where, orderBy, getDocs, doc, getDoc, deleteDoc } from "firebase/firestore";
-import type { 
-  Severity, 
-  AttributeMetrics, 
-  Recommendation, 
-  DistributionPoint, 
-  IntersectionalPoint, 
-  ProxyVariable, 
-  HeatmapCell 
-} from "../types/audit";
+import type { AnalysisResult } from "./api";
 
 export interface AuditRecord {
   id?: string;
   userId: string;
   datasetName: string;
-  datasetUrl?: string;
   createdAt: Timestamp;
-  metrics: Record<string, AttributeMetrics>;
-  biasScore: number;
-  summary: string;
-  top_features: string[];
-  recommendations: Recommendation[];
-  rowCount?: number;
-  severity?: Severity;
-  distributions?: DistributionPoint[];
-  intersectional?: IntersectionalPoint[];
-  proxyVariables?: ProxyVariable[];
-  heatmap?: HeatmapCell[];
+  result: AnalysisResult;
 }
 
 export const firestoreService = {
