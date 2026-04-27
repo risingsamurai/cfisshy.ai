@@ -52,16 +52,6 @@ export default function Landing() {
         </div>
       </div>
 
-      {/* SDG Banner */}
-      <div
-        className="relative z-40"
-        style={{ background: "linear-gradient(to right, #1a1a2e, #16213e)" }}
-      >
-        <div className="flex items-center justify-center px-4 py-2 text-xs text-white/70">
-          LUMIS.AI addresses UN SDG 10 — Reduced Inequalities
-        </div>
-      </div>
-
       {/* HERO */}
       <section
         className="relative flex min-h-screen flex-col items-center justify-end overflow-hidden px-4 pb-20 text-center -mt-[100px]"
