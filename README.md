@@ -227,7 +227,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 <div align="center">
 
-Built with ❤️ by **Wagner Sentinel AI**  
+Built with by **Wagner Sentinel AI**  
 *Making AI fair, one audit at a time.*
 
 </div>
