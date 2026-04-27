@@ -54,7 +54,7 @@ export default function Landing() {
 
       {/* HERO */}
       <section
-        className="relative flex min-h-screen flex-col items-center justify-end overflow-hidden px-4 pb-20 text-center -mt-[100px]"
+        className="relative flex min-h-screen flex-col items-center justify-end overflow-hidden px-4 pb-20 pt-20 text-center"
         onMouseMove={handleMouseMove}
       >
         {/* Robot Background */}
@@ -69,6 +69,8 @@ export default function Landing() {
               left: 0,
               width: "100%",
               height: "100%",
+              maxHeight: "80vh",
+              objectFit: "contain",
               border: "none",
               pointerEvents: "none",
               background: "transparent",
